@@ -1,0 +1,166 @@
+import java.io.*;
+import java.time.*;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+
+// ========== MODEL ==========
+class Student {
+    private String id, name, course, yearLevel;
+
+    public Student(String id, String name, String course, String yearLevel) {
+        this.id = id;
+        this.name = name;
+        this.course = course;
+        this.yearLevel = yearLevel;
+    }
+
+    public String getId() { return id; }
+    public String getName() { return name; }
+    public String getCourse() { return course; }
+    public String getYearLevel() { return yearLevel; }
+}
+
+// ========== DATABASE (Singleton) ==========
+class Database {
+    private static Database instance;
+    private Map<String, Student> students = new HashMap<>();
+    private List<String> loginLogs = new ArrayList<>();
+    private String adminId = "ADMIN123"; // only admin ID
+
+    private Database() {}
+    public static Database getInstance() {
+        if (instance == null) instance = new Database();
+        return instance;
+    }
+
+    public void addStudent(Student s) { students.put(s.getId(), s); }
+    public Student getStudent(String id) { return students.get(id); }
+    public void logLogin(String info) { loginLogs.add(info); }
+    public List<String> getLogs() { return loginLogs; }
+    public String getAdminId() { return adminId; }
+
+    public void exportAnalytics() {
+        try (PrintWriter writer = new PrintWriter(new FileWriter("analytics.txt", true))) {
+            writer.println("=== Library Login Analytics ===");
+            for (String log : loginLogs) writer.println(log);
+            writer.println("Total Logins: " + loginLogs.size());
+            writer.println("===============================\n");
+            System.out.println("Analytics exported to analytics.txt");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+// ========== ABSTRACT CLASS ==========
+abstract class User {
+    protected String id;
+    public User(String id) { this.id = id; }
+    public abstract void login();
+}
+
+// ========== STUDENT USER ==========
+class StudentUser extends User {
+    public StudentUser(String id) { super(id); }
+
+    @Override
+    public void login() {
+        Database db = Database.getInstance();
+        Student s = db.getStudent(id);
+        if (s != null) {
+            String time = LocalDateTime.now().format(DateTimeFormatter.ofPattern("MMMM dd yyyy, hh:mm a"));
+            String log = "Student: " + s.getName() + " | Course: " + s.getCourse() +
+                    " | Year: " + s.getYearLevel() + " | Logged in at " + time + " | Semester: 1st";
+            db.logLogin(log);
+            System.out.println("Welcome " + s.getName() + "!");
+            System.out.println("Logged at: " + time);
+        } else {
+            System.out.println("❌ Student not found!");
+        }
+    }
+}
+
+// ========== ADMIN USER ==========
+class AdminUser extends User {
+    public AdminUser(String id) { super(id); }
+
+    @Override
+    public void login() {
+        Database db = Database.getInstance();
+        if (id.equals(db.getAdminId())) {
+            System.out.println("✅ Admin logged in successfully!");
+            showDashboard();
+        } else {
+            System.out.println("❌ Invalid Admin ID!");
+        }
+    }
+
+    private void showDashboard() {
+        Database db = Database.getInstance();
+        System.out.println("\n=== ADMIN DASHBOARD ===");
+        for (String log : db.getLogs()) System.out.println(log);
+        System.out.println("========================");
+        System.out.println("Total Logins: " + db.getLogs().size());
+        System.out.println("1. Export Analytics");
+        System.out.println("2. Back to Main Menu");
+        System.out.print("Choose: ");
+
+        Scanner sc = new Scanner(System.in);
+        int choice = sc.nextInt();
+        if (choice == 1) db.exportAnalytics();
+    }
+}
+
+// ========== MAIN CLASS ==========
+public class Main {
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        Database db = Database.getInstance();
+
+        while (true) {
+            System.out.println("\n=== 📚 LIBRARY LOGIN SYSTEM ===");
+            System.out.println("1. Register Student");
+            System.out.println("2. Student Login");
+            System.out.println("3. Admin Login");
+            System.out.println("4. Exit");
+            System.out.print("Choose option: ");
+            int choice = sc.nextInt();
+            sc.nextLine(); // consume newline
+
+            switch (choice) {
+                case 1:
+                    System.out.print("Enter Student ID: ");
+                    String id = sc.nextLine();
+                    System.out.print("Enter Name: ");
+                    String name = sc.nextLine();
+                    System.out.print("Enter Course: ");
+                    String course = sc.nextLine();
+                    System.out.print("Enter Year Level: ");
+                    String year = sc.nextLine();
+                    db.addStudent(new Student(id, name, course, year));
+                    System.out.println("✅ Student Registered Successfully!");
+                    break;
+
+                case 2:
+                    System.out.print("Enter Student ID: ");
+                    String sid = sc.nextLine();
+                    new StudentUser(sid).login();
+                    break;
+
+                case 3:
+                    System.out.print("Enter Admin ID: ");
+                    String aid = sc.nextLine();
+                    new AdminUser(aid).login();
+                    break;
+
+                case 4:
+                    System.out.println("Goodbye!");
+                    System.exit(0);
+                    break;
+
+                default:
+                    System.out.println("Invalid option! Try again.");
+            }
+        }
+    }
+}

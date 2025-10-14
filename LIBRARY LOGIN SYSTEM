@@ -1,0 +1,258 @@
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
+import java.io.*;
+import java.time.*;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+
+// ========== MODEL ==========
+class Student {
+    private String id, name, course, yearLevel;
+    public Student(String id, String name, String course, String yearLevel) {
+        this.id = id;
+        this.name = name;
+        this.course = course;
+        this.yearLevel = yearLevel;
+    }
+    public String getId() { return id; }
+    public String getName() { return name; }
+    public String getCourse() { return course; }
+    public String getYearLevel() { return yearLevel; }
+}
+
+// ========== DATABASE (Singleton) ==========
+class Database {
+    private static Database instance;
+    private Map<String, Student> students = new HashMap<>();
+    private java.util.List<String> loginLogs = new ArrayList<>();
+    private String adminId = "ADMIN123"; // only admin ID
+
+    private Database() {}
+    public static Database getInstance() {
+        if (instance == null) instance = new Database();
+        return instance;
+    }
+    public void addStudent(Student s) { students.put(s.getId(), s); }
+    public Student getStudent(String id) { return students.get(id); }
+    public void logLogin(String info) { loginLogs.add(info); }
+    public java.util.List<String> getLogs() { return loginLogs; }
+    public void exportAnalytics() {
+        try (PrintWriter writer = new PrintWriter(new FileWriter("analytics.txt", true))) {
+            writer.println("=== Library Login Analytics ===");
+            for (String log : loginLogs) writer.println(log);
+            writer.println("Total Logins: " + loginLogs.size());
+            writer.println("===============================\n");
+            JOptionPane.showMessageDialog(null, "Analytics exported to analytics.txt");
+        } catch (IOException e) { e.printStackTrace(); }
+    }
+    public String getAdminId() { return adminId; }
+}
+
+// ========== ABSTRACT CLASS ==========
+abstract class User {
+    protected String id;
+    public User(String id) { this.id = id; }
+    public abstract void login();
+}
+
+// ========== STUDENT USER ==========
+class StudentUser extends User {
+    public StudentUser(String id) { super(id); }
+    @Override
+    public void login() {
+        Database db = Database.getInstance();
+        Student s = db.getStudent(id);
+        if (s != null) {
+            String time = LocalDateTime.now().format(DateTimeFormatter.ofPattern("MMMM dd yyyy, hh:mm a"));
+            String log = "Student: " + s.getName() + " | Course: " + s.getCourse() +
+                    " | Year: " + s.getYearLevel() + " | Logged in at " + time + " | Semester: 1st";
+            db.logLogin(log);
+            JOptionPane.showMessageDialog(null, "Welcome " + s.getName() + "!\nLogged at: " + time);
+        } else {
+            JOptionPane.showMessageDialog(null, "Student not found!");
+        }
+    }
+}
+
+// ========== ADMIN USER ==========
+class AdminUser extends User {
+    public AdminUser(String id) { super(id); }
+    @Override
+    public void login() {
+        Database db = Database.getInstance();
+        if (id.equals(db.getAdminId())) new AdminDashboard();
+        else JOptionPane.showMessageDialog(null, "Invalid Admin ID!");
+    }
+}
+
+// ========== MAIN MENU (Simplified GUI) ==========
+public class Main extends JFrame {
+    public Main() {
+        setTitle("📚 Library Login System");
+        setSize(400, 400);
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+
+        // Panel and styling
+        JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setBackground(new Color(240, 248, 255)); // light blue
+        panel.setBorder(BorderFactory.createEmptyBorder(40, 40, 40, 40));
+
+        JLabel title = new JLabel("Library Login System", SwingConstants.CENTER);
+        title.setFont(new Font("Segoe UI", Font.BOLD, 20));
+        title.setAlignmentX(Component.CENTER_ALIGNMENT);
+        title.setForeground(new Color(25, 25, 112));
+
+        JButton studentLogin = createStyledButton("🎓 Student Login", new Color(100, 149, 237));
+        JButton studentRegister = createStyledButton("📝 Register Student", new Color(60, 179, 113));
+        JButton adminLogin = createStyledButton("🔑 Admin Login", new Color(255, 140, 0));
+
+        panel.add(title);
+        panel.add(Box.createRigidArea(new Dimension(0, 30)));
+        panel.add(studentLogin);
+        panel.add(Box.createRigidArea(new Dimension(0, 15)));
+        panel.add(studentRegister);
+        panel.add(Box.createRigidArea(new Dimension(0, 15)));
+        panel.add(adminLogin);
+
+        studentLogin.addActionListener(e -> new StudentLoginGUI());
+        studentRegister.addActionListener(e -> new StudentRegisterGUI());
+        adminLogin.addActionListener(e -> new AdminLoginGUI());
+
+        add(panel);
+        setVisible(true);
+    }
+
+    private JButton createStyledButton(String text, Color color) {
+        JButton button = new JButton(text);
+        button.setAlignmentX(Component.CENTER_ALIGNMENT);
+        button.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        button.setForeground(Color.WHITE);
+        button.setBackground(color);
+        button.setFocusPainted(false);
+        button.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
+        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        button.setMaximumSize(new Dimension(220, 50));
+        return button;
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(Main::new);
+    }
+}
+
+// ========== STUDENT LOGIN GUI ==========
+class StudentLoginGUI extends JFrame {
+    public StudentLoginGUI() {
+        setTitle("Student Login");
+        setSize(300, 200);
+        setLocationRelativeTo(null);
+        setLayout(new GridLayout(3, 1, 10, 10));
+
+        JTextField idField = new JTextField();
+        JButton loginBtn = new JButton("Login");
+
+        loginBtn.setBackground(new Color(65, 105, 225));
+        loginBtn.setForeground(Color.WHITE);
+        loginBtn.setFont(new Font("Segoe UI", Font.BOLD, 13));
+
+        add(new JLabel("Enter Student ID:", SwingConstants.CENTER));
+        add(idField);
+        add(loginBtn);
+
+        loginBtn.addActionListener(e -> new StudentUser(idField.getText()).login());
+        setVisible(true);
+    }
+}
+
+// ========== STUDENT REGISTER GUI ==========
+class StudentRegisterGUI extends JFrame {
+    public StudentRegisterGUI() {
+        setTitle("Register Student");
+        setSize(400, 300);
+        setLocationRelativeTo(null);
+        setLayout(new GridLayout(5, 2, 10, 10));
+
+        JTextField idField = new JTextField();
+        JTextField nameField = new JTextField();
+        JTextField courseField = new JTextField();
+        JTextField yearField = new JTextField();
+        JButton registerBtn = new JButton("Register");
+
+        registerBtn.setBackground(new Color(34, 139, 34));
+        registerBtn.setForeground(Color.WHITE);
+        registerBtn.setFont(new Font("Segoe UI", Font.BOLD, 13));
+
+        add(new JLabel("Student ID:"));
+        add(idField);
+        add(new JLabel("Name:"));
+        add(nameField);
+        add(new JLabel("Course:"));
+        add(courseField);
+        add(new JLabel("Year Level:"));
+        add(yearField);
+        add(registerBtn);
+
+        registerBtn.addActionListener(e -> {
+            Database db = Database.getInstance();
+            db.addStudent(new Student(idField.getText(), nameField.getText(), courseField.getText(), yearField.getText()));
+            JOptionPane.showMessageDialog(null, "Student Registered Successfully!");
+            dispose();
+        });
+
+        setVisible(true);
+    }
+}
+
+// ========== ADMIN LOGIN GUI ==========
+class AdminLoginGUI extends JFrame {
+    public AdminLoginGUI() {
+        setTitle("Admin Login");
+        setSize(300, 200);
+        setLocationRelativeTo(null);
+        setLayout(new GridLayout(3, 1, 10, 10));
+
+        JTextField idField = new JTextField();
+        JButton loginBtn = new JButton("Login");
+
+        loginBtn.setBackground(new Color(255, 140, 0));
+        loginBtn.setForeground(Color.WHITE);
+        loginBtn.setFont(new Font("Segoe UI", Font.BOLD, 13));
+
+        add(new JLabel("Enter Admin ID:", SwingConstants.CENTER));
+        add(idField);
+        add(loginBtn);
+
+        loginBtn.addActionListener(e -> new AdminUser(idField.getText()).login());
+        setVisible(true);
+    }
+}
+
+// ========== ADMIN DASHBOARD ==========
+class AdminDashboard extends JFrame {
+    public AdminDashboard() {
+        setTitle("Admin Dashboard");
+        setSize(500, 400);
+        setLocationRelativeTo(null);
+
+        JTextArea logsArea = new JTextArea();
+        logsArea.setEditable(false);
+        logsArea.setFont(new Font("Consolas", Font.PLAIN, 13));
+
+        JButton exportBtn = new JButton("Export Analytics");
+        exportBtn.setBackground(new Color(70, 130, 180));
+        exportBtn.setForeground(Color.WHITE);
+        exportBtn.setFont(new Font("Segoe UI", Font.BOLD, 13));
+
+        add(new JScrollPane(logsArea), BorderLayout.CENTER);
+        add(exportBtn, BorderLayout.SOUTH);
+
+        Database db = Database.getInstance();
+        for (String log : db.getLogs()) logsArea.append(log + "\n");
+
+        exportBtn.addActionListener(e -> db.exportAnalytics());
+        setVisible(true);
+    }
+}

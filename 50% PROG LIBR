@@ -1,0 +1,178 @@
+import java.awt.*;
+import java.time.*;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+import javax.swing.*;
+
+// ========== MODEL ==========
+class Student {
+    private String id, name, course, year;
+    public Student(String id, String name, String course, String year) {
+        this.id = id; this.name = name; this.course = course; this.year = year;
+    }
+    public String getId() { return id; }
+    public String getName() { return name; }
+    public String getCourse() { return course; }
+    public String getYear() { return year; }
+}
+
+// ========== DATABASE ==========
+class Database {
+    private static Database instance;
+    private Map<String, Student> students = new HashMap<>();
+    private java.util.List<String> logs = new ArrayList<>();
+    private final String ADMIN_ID = "ADMIN123";
+
+    private Database() {}
+    public static Database getInstance() {
+        if (instance == null) instance = new Database();
+        return instance;
+    }
+
+    public void addStudent(Student s) { students.put(s.getId(), s); }
+    public Student getStudent(String id) { return students.get(id); }
+    public void addLog(String log) { logs.add(log); }
+    public java.util.List<String> getLogs() { return logs; }
+    public String getAdminId() { return ADMIN_ID; }
+}
+
+// ========== ABSTRACT USER ==========
+abstract class User {
+    protected String id;
+    public User(String id) { this.id = id; }
+    public abstract void login();
+}
+
+// ========== STUDENT USER ==========
+class StudentUser extends User {
+    public StudentUser(String id) { super(id); }
+    @Override
+    public void login() {
+        Database db = Database.getInstance();
+        Student s = db.getStudent(id);
+        if (s == null) {
+            JOptionPane.showMessageDialog(null, "Student not found!");
+            return;
+        }
+        String time = LocalDateTime.now().format(DateTimeFormatter.ofPattern("MMM dd yyyy, hh:mm a"));
+        String log = s.getName() + " (" + s.getCourse() + " - " + s.getYear() + ") logged in at " + time;
+        db.addLog(log);
+        JOptionPane.showMessageDialog(null, "Welcome " + s.getName() + "!\n" + time);
+    }
+}
+
+// ========== ADMIN USER ==========
+class AdminUser extends User {
+    public AdminUser(String id) { super(id); }
+    @Override
+    public void login() {
+        Database db = Database.getInstance();
+        if (!id.equals(db.getAdminId())) {
+            JOptionPane.showMessageDialog(null, "Invalid Admin ID!");
+            return;
+        }
+        JFrame frame = new JFrame("Admin Dashboard");
+        JTextArea area = new JTextArea(10, 30);
+        for (String log : db.getLogs()) area.append(log + "\n");
+        frame.add(new JScrollPane(area));
+        frame.pack();
+        frame.setLocationRelativeTo(null);
+        frame.setVisible(true);
+    }
+}
+
+// ========== MAIN MENU ==========
+public class Main extends JFrame {
+    public Main() {
+        setTitle("Library Login System");
+        setSize(300, 300);
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setLayout(new GridLayout(3, 1, 10, 10));
+        setLocationRelativeTo(null);
+
+        JButton studentBtn = new JButton("Student Login");
+        JButton registerBtn = new JButton("Register Student");
+        JButton adminBtn = new JButton("Admin Login");
+
+        studentBtn.addActionListener(e -> new StudentLoginGUI());
+        registerBtn.addActionListener(e -> new StudentRegisterGUI());
+        adminBtn.addActionListener(e -> new AdminLoginGUI());
+
+        add(studentBtn);
+        add(registerBtn);
+        add(adminBtn);
+        setVisible(true);
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(Main::new);
+    }
+}
+
+// ========== STUDENT LOGIN ==========
+class StudentLoginGUI extends JFrame {
+    public StudentLoginGUI() {
+        setTitle("Student Login");
+        setSize(250, 150);
+        setLayout(new GridLayout(2, 1, 5, 5));
+        setLocationRelativeTo(null);
+
+        JTextField idField = new JTextField();
+        JButton login = new JButton("Login");
+        add(idField); add(login);
+
+        login.addActionListener(e -> new StudentUser(idField.getText().trim()).login());
+        setVisible(true);
+    }
+}
+
+// ========== STUDENT REGISTER ==========
+class StudentRegisterGUI extends JFrame {
+    public StudentRegisterGUI() {
+        setTitle("Register Student");
+        setSize(300, 200);
+        setLayout(new GridLayout(5, 2, 5, 5));
+        setLocationRelativeTo(null);
+
+        JTextField id = new JTextField(), name = new JTextField(), course = new JTextField(), year = new JTextField();
+        JButton register = new JButton("Register");
+
+        add(new JLabel("ID:")); add(id);
+        add(new JLabel("Name:")); add(name);
+        add(new JLabel("Course:")); add(course);
+        add(new JLabel("Year:")); add(year);
+        add(register);
+
+        register.addActionListener(e -> {
+            String sid = id.getText().trim(), sname = name.getText().trim();
+            String scourse = course.getText().trim(), syear = year.getText().trim();
+            if (sid.isEmpty() || sname.isEmpty()) {
+                JOptionPane.showMessageDialog(null, "Please fill all fields!");
+                return;
+            }
+            Database db = Database.getInstance();
+            db.addStudent(new Student(sid, sname, scourse, syear));
+            JOptionPane.showMessageDialog(null, "Student Registered!");
+            dispose();
+        });
+
+        setVisible(true);
+    }
+}
+
+// ========== ADMIN LOGIN ==========
+class AdminLoginGUI extends JFrame {
+    public AdminLoginGUI() {
+        setTitle("Admin Login");
+        setSize(250, 150);
+        setLayout(new GridLayout(2, 1, 5, 5));
+        setLocationRelativeTo(null);
+
+        JTextField idField = new JTextField();
+        JButton login = new JButton("Login");
+        add(idField); add(login);
+
+        login.addActionListener(e -> new AdminUser(idField.getText().trim()).login());
+        setVisible(true);
+    }
+}
